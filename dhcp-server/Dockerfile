@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get update && apt-get install -y \
     gettext-base \
     isc-kea \
+    isc-kea-ctrl-agent \
     isc-kea-hooks \
     isc-stork-agent \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
