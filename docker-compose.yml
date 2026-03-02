@@ -41,6 +41,6 @@ services:
       - INTERFACES=${INTERFACES}
     volumes:
       - ./kea-config:/etc/kea
-      - ./kea-sockets:/run/kea
+      - ./kea-sockets:/var/run/kea
     depends_on:
       - stork-server
