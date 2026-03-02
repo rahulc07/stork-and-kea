@@ -35,7 +35,9 @@ services:
     build: ./dhcp-server
     network_mode: "host"
     environment:
-      - STORK_SERVER_URL=http://localhost:8087
+      - STORK_AGENT_SERVER_URL=http://localhost:8087
+      - STORK_AGENT_HOST=192.168.1.1
+      - ./stork-agent-data:/var/lib/stork-agent
       - INTERFACES=eno2.atlantis
     volumes:
       - ./kea-config:/etc/kea
