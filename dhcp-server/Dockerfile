@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get update && apt-get install -y \
     gettext-base \
     kea \
-    stork-agent \
+    isc-stork-agent \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 # Kea basic setup
 RUN mkdir -p /etc/kea-distribution
