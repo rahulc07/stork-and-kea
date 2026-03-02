@@ -36,9 +36,9 @@ services:
     network_mode: "host"
     environment:
       - STORK_AGENT_SERVER_URL=http://localhost:8087
-      - STORK_AGENT_HOST=192.168.1.1
+      - STORK_AGENT_HOST=${HOST_IP}
       - ./stork-agent-data:/var/lib/stork-agent
-      - INTERFACES=eno2.atlantis
+      - INTERFACES=${INTERFACES}
     volumes:
       - ./kea-config:/etc/kea
       - ./kea-sockets:/run/kea
