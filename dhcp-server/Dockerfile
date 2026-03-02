@@ -15,8 +15,7 @@ RUN apt-get update && apt-get install -y \
     && curl -1sLf 'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash \
     && apt-get update && apt-get install -y \
     gettext-base \
-    isc-kea-dhcp4-server \
-    isc-kea-ctrl-agent \
+    isc-kea \
     isc-stork-agent \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 # Kea basic setup
