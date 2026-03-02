@@ -7,13 +7,8 @@
     ],
     "control-sockets": [
         {
-            "socket-type": "http",
-            "socket-address": "127.0.0.1",
-            "socket-port": 8000,
-        },
-        {
             "socket-type": "unix",
-            "socket-name": "/var/run/kea"
+            "socket-name": "/var/run/kea/dhcpv4.socket"
         }
     ],
     "loggers": [
