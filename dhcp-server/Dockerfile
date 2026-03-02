@@ -11,7 +11,7 @@ WORKDIR .
 RUN apt-get update && apt-get install -y \
     curl \
     supervisor \
-    && curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-2-6/setup.deb.sh' | bash \
+    && curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-3-0/setup.deb.sh' | bash \
     && curl -1sLf 'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash \
     && apt-get update && apt-get install -y \
     gettext-base \
