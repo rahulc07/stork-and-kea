@@ -18,7 +18,7 @@ services:
     build:
       context: ./stork-server
     ports:
-      - "8080:8080"
+      - "8087:8080"
     environment:
       - STORK_DATABASE_HOST=stork-db
       - STORK_DATABASE_NAME=stork
@@ -29,12 +29,16 @@ services:
         condition: service_healthy
   # no ports needed cause network_mode: hsot
   kea-dhcp:
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     build: ./dhcp-server
     network_mode: "host"
     environment:
-      - STORK_SERVER_URL=http://localhost:8080
+      - STORK_SERVER_URL=http://localhost:8087
       - INTERFACES=eno2.atlantis
     volumes:
       - ./kea-config:/etc/kea
+      - ./kea-sockets:/run/kea
     depends_on:
       - stork-server

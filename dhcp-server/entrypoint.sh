@@ -7,6 +7,7 @@ if [ -z "$(ls -A /etc/kea)" ]; then
     envsubst < /etc/kea-distribution/kea-dhcp4.conf.template > /etc/kea/kea-dhcp4.conf
     cp /etc/kea-distribution/kea-ctrl-agent.conf /etc/kea/kea-ctrl-agent.conf
 fi
-chown -R _kea:_kea /etc/kea /var/run/kea
+chown -R _kea:_kea /etc/kea /run/kea
+chmod -R 750 /run/kea
 
 exec "$@"
