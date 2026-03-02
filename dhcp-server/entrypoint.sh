@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+export INTERFACES=${INTERFACES:-"*"}
+if [ -z "$(ls -A /etc/kea)" ]; then
+    echo "Config directory /etc/kea is empty. Defaulting to basic configs"
+    echo "Generating kea-dhcp4.conf from template using INTERFACES=$INTERFACES"
+    envsubst < /etc/kea-distribution/kea-dhcp4.conf.template > /etc/kea/kea-dhcp4.conf
+    cp /etc/kea-distribution/kea-ctrl-agent.conf /etc/kea/kea-ctrl-agent.conf
+fi
+chown -R _kea:_kea /etc/kea /var/run/kea
+
+exec "$@"

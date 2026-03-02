@@ -1,0 +1,41 @@
+services:
+  stork-db:
+    image: postgres:18
+    shm_size: 128mb
+    environment:
+      - POSTGRES_USER=stork
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=stork
+    volumes: 
+      - ./postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stork"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  stork-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8080:8080"
+    environment:
+      - STORK_DATABASE_HOST=stork-db
+      - STORK_DATABASE_NAME=stork
+      - STORK_DATABASE_USER=stork
+      - STORK_DATABASE_PASSWORD=${DB_PASSWORD}
+    depends_on:
+      stork-db:
+        condition: service_healthy
+  # no ports needed cause network_mode: hsot
+  kea-dhcp:
+    build: .
+    network_mode: "host"
+    environment:
+      - STORK_SERVER_URL=http://localhost:8080
+      - INTERFACES=eno2.atlantis
+    volumes:
+      - ./kea-config:/etc/kea
+    depends_on:
+      - stork-server
