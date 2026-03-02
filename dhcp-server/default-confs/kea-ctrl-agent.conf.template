@@ -1,6 +1,6 @@
 {
 "Control-agent": {
-    "http-host": "0.0.0.0",
+    "http-host": "$HOST_IP",
     "http-port": 8000,
     "control-sockets": {
         "dhcp4": {
