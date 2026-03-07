@@ -9,3 +9,5 @@ This sets up a Kea 3.0 with the Stork managemnet UI for DHCP. By default it will
 ```
 docker compose up -d
 ```
+
+Go to 0.0.0.0:8087 to setup
