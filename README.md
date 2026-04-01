@@ -10,4 +10,7 @@ This sets up a Kea 3.0 with the Stork managemnet UI for DHCP. By default it will
 docker compose up -d
 ```
 
-Go to 0.0.0.0:8087 to setup
+# Configuring
+Go to localhost:8087 to get to stork, the default username/password is admin/admin, it will prompt you to change your password.
+
+Once that is complete click on the Yellow Banner to allow the Kea server to connect to stork.
