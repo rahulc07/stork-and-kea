@@ -2,6 +2,9 @@
 
 This sets up a Kea 3.0 with the Stork managemnet UI for DHCP. By default it will use the hosts network so use the host interface names.
 
+# Pre-Reqs
+Set a static IP on the interface you want to have DHCP on, this is needed so that we can loopback on our own subnet.
+
 # Running
 1. Copy dotenv-template to .env
 2. Edit .env with your options, host ip should be a static IP for your host (not 127.0.0.1 or localhost)
