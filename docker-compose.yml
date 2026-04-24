@@ -45,5 +45,6 @@ services:
       - ./stork-agent-data:/var/lib/stork-agent
       - ./kea-config:/etc/kea
       - ./kea-sockets:/var/run/kea
+      - ./kea-db:/var/lib/kea
     depends_on:
       - stork-server
