@@ -30,13 +30,14 @@ WORKDIR /build/kea-Kea-3.0.3
 # Add Infiniband Support
 RUN patch -Np1 -i ../134.patch
 WORKDIR /build/kea-Kea-3.0.3/build
+# build instructions from lfs
 RUN meson setup ..             \
       --prefix=/usr        \
       --sysconfdir=/etc    \
       --localstatedir=/var \
       --buildtype=release  \
       -D crypto=openssl    \
-      -D runstatedir=/run
+      -D runstatedir=/var/run
 RUN ninja && DESTDIR=/build/kea ninja install 
 
 
@@ -58,10 +59,16 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     liblog4cplus-2.0.5t64 \
     gettext-base \
-    libboost-dev \
+    libboost-all-dev \
+    && curl -1sLf 'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash \
+    && apt-get update && apt-get install -y isc-stork-agent \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 COPY --from=buildkea /build/kea/usr /usr/
 COPY --from=buildkea /build/kea/etc/kea /etc/kea
+RUN groupadd -r _kea && useradd -r -g _kea -d /var/run/kea -s /sbin/nologin _kea
+RUN mkdir -p /var/run/kea /var/lib/kea /var/log/kea && \
+    chown -R _kea:_kea /etc/kea /var/run/kea /var/lib/kea /var/log/kea
 RUN ldconfig
 
 # Kea basic setup
