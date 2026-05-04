@@ -30,7 +30,9 @@
       }
     ],
     "interfaces-config": {
-        "interfaces": [ "$INTERFACES" ]
+        "service-sockets-require-all": true,
+        "interfaces": [ "$INTERFACES" ],
+        "re-detect": true
     },
     "lease-database": {
         "type": "memfile"
