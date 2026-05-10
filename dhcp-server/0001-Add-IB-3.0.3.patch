@@ -1,7 +1,7 @@
-diff --git a/kea-Kea-3.0.3/doc/sphinx/arm/dhcp4-srv.rst b/kea-Kea-3.0.3-patch/doc/sphinx/arm/dhcp4-srv.rst
+diff --git a/doc/sphinx/arm/dhcp4-srv.rst b/doc/sphinx/arm/dhcp4-srv.rst
 index af4fdfe..1d2b437 100644
---- a/kea-Kea-3.0.3/doc/sphinx/arm/dhcp4-srv.rst
-+++ b/kea-Kea-3.0.3-patch/doc/sphinx/arm/dhcp4-srv.rst
+--- a/doc/sphinx/arm/dhcp4-srv.rst
++++ b/doc/sphinx/arm/dhcp4-srv.rst
 @@ -8356,9 +8356,11 @@ are clearly marked as such.
     headers (including data link layer, IP, and UDP headers) are created
     and parsed by Kea, rather than by the system kernel. Currently, Kea
@@ -16,10 +16,10 @@ index af4fdfe..1d2b437 100644
  
  .. _dhcp4-srv-examples:
  
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/dhcp4.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/dhcp4.h
+diff --git a/src/lib/dhcp/dhcp4.h b/src/lib/dhcp/dhcp4.h
 index 11487a0..3ce5c6f 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/dhcp4.h
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/dhcp4.h
+--- a/src/lib/dhcp/dhcp4.h
++++ b/src/lib/dhcp/dhcp4.h
 @@ -60,8 +60,8 @@ enum HType {
                           ///  arp-parameters/arp-parameters.xhtml suggest that
                           ///  Ethernet (1) should be used in DOCSIS environment.
@@ -31,10 +31,10 @@ index 11487a0..3ce5c6f 100644
  };
  
  /* DHCP Option codes: */
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/hwaddr.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/hwaddr.h
+diff --git a/src/lib/dhcp/hwaddr.h b/src/lib/dhcp/hwaddr.h
 index 55d475b..2e7d1e1 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/hwaddr.h
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/hwaddr.h
+--- a/src/lib/dhcp/hwaddr.h
++++ b/src/lib/dhcp/hwaddr.h
 @@ -23,6 +23,9 @@ public:
      /// @brief Size of an ethernet hardware address.
      static const size_t ETHERNET_HWADDR_LEN = 6;
@@ -45,10 +45,10 @@ index 55d475b..2e7d1e1 100644
      /// @brief Maximum size of a hardware address.
      static const size_t MAX_HWADDR_LEN = 20;
  
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.cc
+diff --git a/src/lib/dhcp/iface_mgr.cc b/src/lib/dhcp/iface_mgr.cc
 index 960e71d..a833482 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.cc
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.cc
+--- a/src/lib/dhcp/iface_mgr.cc
++++ b/src/lib/dhcp/iface_mgr.cc
 @@ -62,7 +62,7 @@ IfaceMgr::instancePtr() {
  }
  
@@ -110,10 +110,10 @@ index 960e71d..a833482 100644
          out << ", flags=" << hex << iface->flags_ << dec << "("
              << (iface->flag_loopback_?"LOOPBACK ":"")
              << (iface->flag_up_?"UP ":"")
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.h
+diff --git a/src/lib/dhcp/iface_mgr.h b/src/lib/dhcp/iface_mgr.h
 index 6d043d3..535e845 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.h
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.h
+--- a/src/lib/dhcp/iface_mgr.h
++++ b/src/lib/dhcp/iface_mgr.h
 @@ -204,6 +204,28 @@ public:
      /// that returned it.
      const uint8_t* getMac() const { return mac_; }
@@ -156,10 +156,10 @@ index 6d043d3..535e845 100644
      /// Hardware type.
      uint16_t hardware_type_;
  
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_bsd.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_bsd.cc
+diff --git a/src/lib/dhcp/iface_mgr_bsd.cc b/src/lib/dhcp/iface_mgr_bsd.cc
 index 959eb95..3da3c2e 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_bsd.cc
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_bsd.cc
+--- a/src/lib/dhcp/iface_mgr_bsd.cc
++++ b/src/lib/dhcp/iface_mgr_bsd.cc
 @@ -25,6 +25,22 @@ using namespace isc;
  using namespace isc::asiolink;
  using namespace isc::dhcp;
@@ -202,10 +202,10 @@ index 959eb95..3da3c2e 100644
          } else if (ifptr->ifa_addr->sa_family == AF_INET6) {
              // IPv6 Addr
              struct sockaddr_in6 * adata =
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_linux.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_linux.cc
+diff --git a/src/lib/dhcp/iface_mgr_linux.cc b/src/lib/dhcp/iface_mgr_linux.cc
 index d49518c..5b3ec06 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_linux.cc
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_linux.cc
+--- a/src/lib/dhcp/iface_mgr_linux.cc
++++ b/src/lib/dhcp/iface_mgr_linux.cc
 @@ -403,6 +403,18 @@ void Netlink::release_list(NetlinkMessages& messages) {
      messages.clear();
  }
@@ -242,10 +242,10 @@ index d49518c..5b3ec06 100644
          nl.ipaddrs_get(*iface, addr_info);
  
          // addInterface can now throw so protect against memory leaks.
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/pkt4.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt4.cc
+diff --git a/src/lib/dhcp/pkt4.cc b/src/lib/dhcp/pkt4.cc
 index 88bbbce..d23d6e5 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/pkt4.cc
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt4.cc
+--- a/src/lib/dhcp/pkt4.cc
++++ b/src/lib/dhcp/pkt4.cc
 @@ -84,6 +84,15 @@ Pkt4::pack() {
  
      try {
@@ -286,10 +286,10 @@ index 88bbbce..d23d6e5 100644
          isc_throw(OutOfRange, "Invalid HW Address specified");
      }
  
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/pkt_filter_lpf.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt_filter_lpf.cc
+diff --git a/src/lib/dhcp/pkt_filter_lpf.cc b/src/lib/dhcp/pkt_filter_lpf.cc
 index 368075c..ae76681 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/pkt_filter_lpf.cc
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt_filter_lpf.cc
+--- a/src/lib/dhcp/pkt_filter_lpf.cc
++++ b/src/lib/dhcp/pkt_filter_lpf.cc
 @@ -121,6 +121,98 @@ struct sock_filter dhcp_sock_filter [] = {
      BPF_STMT(BPF_RET + BPF_K, 0),
  };
@@ -470,10 +470,10 @@ index 368075c..ae76681 100644
  
      // IP and UDP header
      writeIpUdpHeader(pkt, buf);
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.cc
+diff --git a/src/lib/dhcp/protocol_util.cc b/src/lib/dhcp/protocol_util.cc
 index da70104..aee5e7a 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.cc
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.cc
+--- a/src/lib/dhcp/protocol_util.cc
++++ b/src/lib/dhcp/protocol_util.cc
 @@ -17,6 +17,14 @@
  
  using namespace isc::asiolink;
@@ -581,10 +581,10 @@ index da70104..aee5e7a 100644
  void
  writeIpUdpHeader(const Pkt4Ptr& pkt, util::OutputBuffer& out_buf) {
  
-diff --git a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.h
+diff --git a/src/lib/dhcp/protocol_util.h b/src/lib/dhcp/protocol_util.h
 index fa6a6f6..534ab4e 100644
---- a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.h
-+++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.h
+--- a/src/lib/dhcp/protocol_util.h
++++ b/src/lib/dhcp/protocol_util.h
 @@ -8,6 +8,7 @@
  #define PROTOCOL_UTIL_H
  
