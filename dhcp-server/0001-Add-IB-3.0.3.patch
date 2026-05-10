@@ -1,0 +1,652 @@
+diff --git a/kea-Kea-3.0.3/doc/sphinx/arm/dhcp4-srv.rst b/kea-Kea-3.0.3-patch/doc/sphinx/arm/dhcp4-srv.rst
+index af4fdfe..1d2b437 100644
+--- a/kea-Kea-3.0.3/doc/sphinx/arm/dhcp4-srv.rst
++++ b/kea-Kea-3.0.3-patch/doc/sphinx/arm/dhcp4-srv.rst
+@@ -8356,9 +8356,11 @@ are clearly marked as such.
+    headers (including data link layer, IP, and UDP headers) are created
+    and parsed by Kea, rather than by the system kernel. Currently, Kea
+    can only parse the data-link layer headers with a format adhering to
+-   the IEEE 802.3 standard, and assumes this data-link-layer header
++   the IEEE 802.3 (Ethernet) standard, and assumes this data-link-layer header
+    format for all interfaces. Thus, Kea does not work on interfaces
+-   which use different data-link-layer header formats (e.g. Infiniband).
++   which use different data-link-layer header formats, with the exception of
++   LPF being able to handle InfiniBand framing, thus enabling Kea to serve
++   these kind of interfaces on Linux.
+ 
+ .. _dhcp4-srv-examples:
+ 
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/dhcp4.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/dhcp4.h
+index 11487a0..3ce5c6f 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/dhcp4.h
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/dhcp4.h
+@@ -60,8 +60,8 @@ enum HType {
+                          ///  arp-parameters/arp-parameters.xhtml suggest that
+                          ///  Ethernet (1) should be used in DOCSIS environment.
+     HTYPE_IEEE802 = 6,   ///< IEEE 802.2 Token Ring
+-    HTYPE_FDDI = 8       ///< FDDI
+-    /// TODO Add infiniband here
++    HTYPE_FDDI = 8,      ///< FDDI
++    HTYPE_INFINIBAND = 32 ///< InfiniBand
+ };
+ 
+ /* DHCP Option codes: */
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/hwaddr.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/hwaddr.h
+index 55d475b..2e7d1e1 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/hwaddr.h
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/hwaddr.h
+@@ -23,6 +23,9 @@ public:
+     /// @brief Size of an ethernet hardware address.
+     static const size_t ETHERNET_HWADDR_LEN = 6;
+ 
++    /// @brief Size of an infiniband hardware address.
++    static const size_t INFINIBAND_HWADDR_LEN = 20;
++
+     /// @brief Maximum size of a hardware address.
+     static const size_t MAX_HWADDR_LEN = 20;
+ 
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.cc
+index 960e71d..a833482 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.cc
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.cc
+@@ -62,7 +62,7 @@ IfaceMgr::instancePtr() {
+ }
+ 
+ Iface::Iface(const std::string& name, unsigned int ifindex)
+-    : name_(name), ifindex_(ifindex), mac_len_(0), hardware_type_(0),
++    : name_(name), ifindex_(ifindex), mac_len_(0), bcast_mac_len_(0), hardware_type_(0),
+       flag_loopback_(false), flag_up_(false), flag_running_(false),
+       flag_multicast_(false), flag_broadcast_(false), flags_(0),
+       inactive4_(false), inactive6_(false) {
+@@ -142,6 +142,21 @@ Iface::getPlainMac() const {
+     return (tmp.str());
+ }
+ 
++std::string
++Iface::getPlainBcastMac() const {
++    ostringstream tmp;
++    tmp.fill('0');
++    tmp << hex;
++    for (int i = 0; i < bcast_mac_len_; i++) {
++        tmp.width(2);
++        tmp << static_cast<int>(bcast_mac_[i]);
++        if (i < bcast_mac_len_-1) {
++            tmp << ":";
++        }
++    }
++    return (tmp.str());
++}
++
+ void Iface::setMac(const uint8_t* mac, size_t len) {
+     if (len > MAX_MAC_LEN) {
+         isc_throw(OutOfRange, "Interface " << getFullName()
+@@ -155,6 +170,19 @@ void Iface::setMac(const uint8_t* mac, size_t len) {
+     }
+ }
+ 
++void Iface::setBcastMac(const uint8_t* mac, size_t len) {
++    if (len > MAX_MAC_LEN) {
++        isc_throw(OutOfRange, "Interface " << getFullName()
++                  << " was detected to have link address of length "
++                  << len << ", but maximum supported length is "
++                  << MAX_MAC_LEN);
++    }
++    bcast_mac_len_ = len;
++    if (len > 0) {
++        memcpy(bcast_mac_, mac, len);
++    }
++}
++
+ bool Iface::delAddress(const isc::asiolink::IOAddress& addr) {
+     for (AddressCollection::iterator a = addrs_.begin(); a != addrs_.end(); ++a) {
+         if (a->get() == addr) {
+@@ -791,7 +819,8 @@ IfaceMgr::printIfaces(std::ostream& out /*= std::cout*/) {
+ 
+         out << "Detected interface " << iface->getFullName()
+             << ", hwtype=" << iface->getHWType()
+-            << ", mac=" << iface->getPlainMac();
++            << ", mac=" << iface->getPlainMac()
++            << ", bcast=" << iface->getPlainBcastMac();
+         out << ", flags=" << hex << iface->flags_ << dec << "("
+             << (iface->flag_loopback_?"LOOPBACK ":"")
+             << (iface->flag_up_?"UP ":"")
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.h
+index 6d043d3..535e845 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr.h
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr.h
+@@ -204,6 +204,28 @@ public:
+     /// that returned it.
+     const uint8_t* getMac() const { return mac_; }
+ 
++    /// @brief Returns broadcast MAC address a plain text.
++    ///
++    /// @return MAC address as a plain text (string)
++    std::string getPlainBcastMac() const;
++
++    /// @brief Sets broadcast MAC address of the interface.
++    ///
++    /// @param mac pointer to bcast MAC address buffer
++    /// @param macLen length of bcast mac address
++    void setBcastMac(const uint8_t* bcastMac, size_t bcastMacLen);
++
++    /// @brief Returns broadcast MAC length.
++    ///
++    /// @return length of bcast MAC address
++    size_t getBcastMacLen() const { return bcast_mac_len_; }
++
++    /// @brief Returns pointer to broadcast MAC address.
++    ///
++    /// Note: Returned pointer is only valid as long as the interface object
++    /// that returned it.
++    const uint8_t* getBcastMac() const { return bcast_mac_; }
++
+     /// @brief Sets flag_*_ fields based on bitmask value returned by OS
+     ///
+     /// @note Implementation of this method is OS-dependent as bits have
+@@ -430,6 +452,12 @@ protected:
+     /// Length of link-layer address (usually 6).
+     size_t mac_len_;
+ 
++    /// Link-layer braodcast address.
++    uint8_t bcast_mac_[MAX_MAC_LEN];
++
++    /// Length of link-layer broadcast address (usually 6).
++    size_t bcast_mac_len_;
++
+     /// Hardware type.
+     uint16_t hardware_type_;
+ 
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_bsd.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_bsd.cc
+index 959eb95..3da3c2e 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_bsd.cc
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_bsd.cc
+@@ -25,6 +25,22 @@ using namespace isc;
+ using namespace isc::asiolink;
+ using namespace isc::dhcp;
+ 
++namespace {
++
++static const uint8_t default_ib_bcast_addr[20] = {
++       0x00, 0xff, 0xff, 0xff,
++       0xff, 0x12, 0x40, 0x1b,
++       0x00, 0x00, 0x00, 0x00,
++       0x00, 0x00, 0x00, 0x00,
++       0xff, 0xff, 0xff, 0xff
++};
++
++static const uint8_t default_ether_bcast_addr[6] = {
++       0xff, 0xff, 0xff, 0xff, 0xff, 0xff
++};
++
++}
++
+ namespace isc {
+ namespace dhcp {
+ 
+@@ -92,6 +108,18 @@ IfaceMgr::detectIfaces(bool update_only) {
+ 
+             iface_iter->second->setHWType(ldata->sdl_type);
+             iface_iter->second->setMac(ptr, ldata->sdl_alen);
++
++            //TODO: I don't have BSD, this needs tested
++            if (ifptr->ifa_flags & IFF_BROADCAST) {
++                ldata = reinterpret_cast<struct sockaddr_dl *>(ifptr->ifa_broadaddr);
++                ptr = reinterpret_cast<uint8_t *>(LLADDR(ldata));
++
++                iface_iter->second->setBcastMac(ptr, ldata->sdl_alen);
++            } else if (interface_info->ifi_type == HTYPE_INFINIBAND) {
++                iface_iter->second->setBcastMac(default_ib_bcast_addr, sizeof(default_ib_bcast_addr));
++            } else if (interface_info->ifi_type == HTYPE_ETHER) {
++                iface_iter->second->setBcastMac(default_ether_bcast_addr, sizeof(default_ether_bcast_addr));
++            }
+         } else if (ifptr->ifa_addr->sa_family == AF_INET6) {
+             // IPv6 Addr
+             struct sockaddr_in6 * adata =
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_linux.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_linux.cc
+index d49518c..5b3ec06 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/iface_mgr_linux.cc
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/iface_mgr_linux.cc
+@@ -403,6 +403,18 @@ void Netlink::release_list(NetlinkMessages& messages) {
+     messages.clear();
+ }
+ 
++static const uint8_t default_ib_bcast_addr[20] = {
++       0x00, 0xff, 0xff, 0xff,
++       0xff, 0x12, 0x40, 0x1b,
++       0x00, 0x00, 0x00, 0x00,
++       0x00, 0x00, 0x00, 0x00,
++       0xff, 0xff, 0xff, 0xff
++};
++
++static const uint8_t default_ether_bcast_addr[6] = {
++       0xff, 0xff, 0xff, 0xff, 0xff, 0xff
++};
++
+ } // end of anonymous namespace
+ 
+ namespace isc {
+@@ -504,6 +516,16 @@ void IfaceMgr::detectIfaces(bool update_only) {
+             // try to dereference it in this manner
+         }
+ 
++        // Does interface have an L2 broadcast address?
++        if ((interface_info->ifi_flags & IFF_BROADCAST) && attribs_table[IFLA_BROADCAST]) {
++            iface->setBcastMac(static_cast<const uint8_t*>(RTA_DATA(attribs_table[IFLA_BROADCAST])),
++                               RTA_PAYLOAD(attribs_table[IFLA_BROADCAST]));
++        } else if (interface_info->ifi_type == HTYPE_INFINIBAND) {
++            iface->setBcastMac(default_ib_bcast_addr, sizeof(default_ib_bcast_addr));
++        } else if (interface_info->ifi_type == HTYPE_ETHER) {
++            iface->setBcastMac(default_ether_bcast_addr, sizeof(default_ether_bcast_addr));
++        }
++
+         nl.ipaddrs_get(*iface, addr_info);
+ 
+         // addInterface can now throw so protect against memory leaks.
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/pkt4.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt4.cc
+index 88bbbce..d23d6e5 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/pkt4.cc
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt4.cc
+@@ -84,6 +84,15 @@ Pkt4::pack() {
+ 
+     try {
+         size_t hw_len = hwaddr_->hwaddr_.size();
++        size_t hw_offset = 0;
++
++        if (hwaddr_->htype_ == HTYPE_INFINIBAND && hw_len == HWAddr::INFINIBAND_HWADDR_LEN) {
++            // According to RFC4390, hlen MUST be zero and chaddr zeroed out.
++            // However, at least dhclient can't handle that and fails.
++            // Instead, return the last 8 bytes, which contain the actual unique hw part.
++            hw_len = 8;
++            hw_offset = HWAddr::INFINIBAND_HWADDR_LEN - 8;
++        }
+ 
+         buffer_out_.writeUint8(op_);
+         buffer_out_.writeUint8(hwaddr_->htype_);
+@@ -101,7 +110,7 @@ Pkt4::pack() {
+         if ((hw_len > 0) && (hw_len <= MAX_CHADDR_LEN)) {
+             // write up to 16 bytes of the hardware address (CHADDR field is 16
+             // bytes long in DHCPv4 message).
+-            buffer_out_.writeData(&hwaddr_->hwaddr_[0],
++            buffer_out_.writeData(&hwaddr_->hwaddr_[hw_offset],
+                                  (hw_len < MAX_CHADDR_LEN ?
+                                   hw_len : MAX_CHADDR_LEN) );
+             hw_len = MAX_CHADDR_LEN - hw_len;
+@@ -473,13 +482,7 @@ void
+ Pkt4::setHWAddrMember(const uint8_t htype, const uint8_t hlen,
+                       const std::vector<uint8_t>& mac_addr,
+                       HWAddrPtr& hw_addr) {
+-    /// @todo Rewrite this once support for client-identifier option
+-    /// is implemented (ticket 1228?)
+-    if (hlen > MAX_CHADDR_LEN) {
+-        isc_throw(OutOfRange, "Hardware address (len=" << static_cast<uint32_t>(hlen)
+-                  << ") too long. Max " << MAX_CHADDR_LEN << " supported.");
+-
+-    } else if (mac_addr.empty() && (hlen > 0) ) {
++    if (mac_addr.empty() && (hlen > 0) ) {
+         isc_throw(OutOfRange, "Invalid HW Address specified");
+     }
+ 
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/pkt_filter_lpf.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt_filter_lpf.cc
+index 368075c..ae76681 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/pkt_filter_lpf.cc
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/pkt_filter_lpf.cc
+@@ -121,6 +121,98 @@ struct sock_filter dhcp_sock_filter [] = {
+     BPF_STMT(BPF_RET + BPF_K, 0),
+ };
+ 
++/// The following structure defines a Berkeley Packet Filter program to perform
++/// packet filtering. The program operates on IPoIB pseudo packets. To help with
++/// interpretation of the program, for the types of packets we are interested
++/// in, the header layout is:
++///
++///  20 bytes  Source Interface Address
++///   2 bytes  Packet Type
++///   2 bytes  Reserved/Unused
++///
++///  The rest is identical to aboves Ethernet-Based packets
++///
++/// Each instruction is preceded with the comments giving the instruction
++/// number within a BPF program, in the following format: #123.
++
++struct sock_filter dhcp_sock_filter_ib [] = {
++    // Make sure this is an IP packet: check the half-word (two bytes)
++    // at offset 20 in the packet (the IPoIB pseudo packet type). If it
++    // is, advance to the next instruction. If not, advance 11
++    // instructions (which takes execution to the last instruction in
++    // the sequence: "drop it").
++    // #0
++    BPF_STMT(BPF_LD + BPF_H + BPF_ABS, IPOIB_PACKET_TYPE_OFFSET),
++    // #1
++    BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETHERTYPE_IP, 0, 11),
++
++    // Make sure it's a UDP packet. The IP protocol is at offset
++    // 9 in the IP header so, adding the IPoIB packet header size
++    // of 24 bytes gives an absolute byte offset in the packet of 33.
++    // #2
++    BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
++             IPOIB_HEADER_LEN + IP_PROTO_TYPE_OFFSET),
++    // #3
++    BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, IPPROTO_UDP, 0, 9),
++
++    // Make sure this isn't a fragment by checking that the fragment
++    // offset field in the IP header is zero. This field is the
++    // least-significant 13 bits in the bytes at offsets 6 and 7 in
++    // the IP header, so the half-word at offset 30 (6 + size of
++    // IPoIB header) is loaded and an appropriate mask applied.
++    // #4
++    BPF_STMT(BPF_LD + BPF_H + BPF_ABS, IPOIB_HEADER_LEN + IP_FLAGS_OFFSET),
++    // #5
++    BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, 0x1fff, 7, 0),
++
++    // Check the packet's destination address. The program will only
++    // allow the packets sent to the broadcast address or unicast
++    // to the specific address on the interface. By default, this
++    // address is set to 0 and must be set to the specific value
++    // when the raw socket is created and the program is attached
++    // to it. The caller must assign the address to the
++    // prog.bf_insns[8].k in the network byte order.
++    // #6
++    BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
++             IPOIB_HEADER_LEN + IP_DEST_ADDR_OFFSET),
++    // If this is a broadcast address, skip the next check.
++    // #7
++    BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0xffffffff, 1, 0),
++    // If this is not broadcast address, compare it with the unicast
++    // address specified for the interface.
++    // #8
++    BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0x00000000, 0, 4),
++
++    // Get the IP header length. This is achieved by the following
++    // (special) instruction that, given the offset of the start
++    // of the IP header (offset 24) loads the IP header length.
++    // #9
++    BPF_STMT(BPF_LDX + BPF_B + BPF_MSH, IPOIB_HEADER_LEN),
++
++    // Make sure it's to the right port. The following instruction
++    // adds the previously extracted IP header length to the given
++    // offset to locate the correct byte. The given offset of 26
++    // comprises the length of the IPoIB header (24) plus the offset
++    // of the UDP destination port (2) within the UDP header.
++    // #10
++    BPF_STMT(BPF_LD + BPF_H + BPF_IND, IPOIB_HEADER_LEN + UDP_DEST_PORT),
++    // The following instruction tests against the default DHCP server port,
++    // but the action port is actually set in PktFilterBPF::openSocket().
++    // N.B. The code in that method assumes that this instruction is at
++    // offset 11 in the program. If this is changed, openSocket() must be
++    // updated.
++    // #11
++    BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, DHCP4_SERVER_PORT, 0, 1),
++
++    // If we passed all the tests, ask for the whole packet.
++    // #12
++    BPF_STMT(BPF_RET + BPF_K, (u_int)-1),
++
++    // Otherwise, drop it.
++    // #13
++    BPF_STMT(BPF_RET + BPF_K, 0),
++};
++
+ }
+ 
+ using namespace isc::util;
+@@ -169,16 +261,29 @@ PktFilterLPF::openSocket(Iface& iface,
+     struct sock_fprog filter_program;
+     memset(&filter_program, 0, sizeof(filter_program));
+ 
+-    filter_program.filter = dhcp_sock_filter;
+-    filter_program.len = sizeof(dhcp_sock_filter) / sizeof(struct sock_filter);
++    if (iface.getHWType() == HTYPE_INFINIBAND) {
++        filter_program.filter = dhcp_sock_filter_ib;
++        filter_program.len = sizeof(dhcp_sock_filter_ib) / sizeof(struct sock_filter);
+ 
+-    // Configure the filter program to receive unicast packets sent to the
+-    // specified address. The program will also allow packets sent to the
+-    // 255.255.255.255 broadcast address.
+-    dhcp_sock_filter[8].k = addr.toUint32();
++        // Configure the filter program to receive unicast packets sent to the
++        // specified address. The program will also allow packets sent to the
++        // 255.255.255.255 broadcast address.
++        dhcp_sock_filter_ib[8].k = addr.toUint32();
+ 
+-    // Override the default port value.
+-    dhcp_sock_filter[11].k = port;
++        // Override the default port value.
++        dhcp_sock_filter_ib[11].k = port;
++    } else {
++        filter_program.filter = dhcp_sock_filter;
++        filter_program.len = sizeof(dhcp_sock_filter) / sizeof(struct sock_filter);
++
++        // Configure the filter program to receive unicast packets sent to the
++        // specified address. The program will also allow packets sent to the
++        // 255.255.255.255 broadcast address.
++        dhcp_sock_filter[8].k = addr.toUint32();
++
++        // Override the default port value.
++        dhcp_sock_filter[11].k = port;
++    }
+     // Apply the filter.
+     if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &filter_program,
+                    sizeof(filter_program)) < 0) {
+@@ -315,7 +420,21 @@ PktFilterLPF::receive(Iface& iface, const SocketInfo& socket_info) {
+     Pkt4Ptr dummy_pkt = Pkt4Ptr(new Pkt4(DHCPDISCOVER, 0));
+ 
+     // Decode ethernet, ip and udp headers.
+-    decodeEthernetHeader(buf, dummy_pkt);
++    if (iface.getHWType() == HTYPE_INFINIBAND) {
++        decodeIPoIBHeader(buf, dummy_pkt);
++
++        // The IPoIB header does not contain the local address.
++        // Set it from the interface instead.
++        if (iface.getMacLen() != HWAddr::INFINIBAND_HWADDR_LEN) {
++            isc_throw(SocketReadError,
++                      "Invalid local hardware address size for IPoIB interface.");
++        }
++        HWAddrPtr hwaddr(new HWAddr(iface.getMac(), iface.getMacLen(),
++                                    iface.getHWType()));
++        dummy_pkt->setLocalHWAddr(hwaddr);
++    } else {
++        decodeEthernetHeader(buf, dummy_pkt);
++    }
+     decodeIpUdpHeader(buf, dummy_pkt);
+ 
+     auto v4_len = buf.getLength() - buf.getPosition();
+@@ -379,11 +498,14 @@ PktFilterLPF::send(const Iface& iface, uint16_t sockfd, const Pkt4Ptr& pkt) {
+         pkt->setLocalHWAddr(hwaddr);
+     }
+ 
+-
+-    // Ethernet frame header.
+-    // Note that we don't validate whether HW addresses in 'pkt'
+-    // are valid because they are checked by the function called.
+-    writeEthernetHeader(pkt, buf);
++    if (iface.getHWType() == HTYPE_INFINIBAND) {
++        writeIPoIBHeader(iface, pkt, buf);
++    } else {
++        // Ethernet frame header.
++        // Note that we don't validate whether HW addresses in 'pkt'
++        // are valid because they are checked by the function called.
++        writeEthernetHeader(pkt, buf);
++    }
+ 
+     // IP and UDP header
+     writeIpUdpHeader(pkt, buf);
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.cc b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.cc
+index da70104..aee5e7a 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.cc
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.cc
+@@ -17,6 +17,14 @@
+ 
+ using namespace isc::asiolink;
+ using namespace isc::util;
++using namespace isc::dhcp;
++
++namespace {
++
++static HWAddr zero_ib_hwaddr(&std::vector<uint8_t>(HWAddr::INFINIBAND_HWADDR_LEN)[0],
++                             HWAddr::INFINIBAND_HWADDR_LEN, HTYPE_INFINIBAND);
++
++}
+ 
+ namespace isc {
+ namespace dhcp {
+@@ -58,6 +66,39 @@ decodeEthernetHeader(InputBuffer& buf, Pkt4Ptr& pkt) {
+     buf.setPosition(start_pos + ETHERNET_HEADER_LEN);
+ }
+ 
++void
++decodeIPoIBHeader(InputBuffer& buf, Pkt4Ptr& pkt) {
++    // The size of the buffer to be parsed must not be lower
++    // then the size of the IPoIB frame header.
++    if (buf.getLength() - buf.getPosition() < IPOIB_HEADER_LEN) {
++        isc_throw(InvalidPacketHeader, "size of ethernet header in received "
++                  << "packet is invalid, expected at least "
++                  << IPOIB_HEADER_LEN << " bytes, received "
++                  << buf.getLength() - buf.getPosition() << " bytes");
++    }
++    // Packet object must not be NULL. We want to output some values
++    // to this object.
++    if (!pkt) {
++        isc_throw(BadValue, "NULL packet object provided when parsing ethernet"
++                  " frame header");
++    }
++
++    // The size of the single address is always lower then the size of
++    // the header that holds this address. Otherwise, it is a programming
++    // error that we want to detect in the compilation time.
++    BOOST_STATIC_ASSERT(IPOIB_HEADER_LEN > HWAddr::INFINIBAND_HWADDR_LEN);
++
++    // Remember initial position.
++    size_t start_pos = buf.getPosition();
++
++    // Read the source HW address.
++    std::vector<uint8_t> src_addr;
++    buf.readVector(src_addr, HWAddr::INFINIBAND_HWADDR_LEN);
++    pkt->setRemoteHWAddr(HWTYPE_INFINIBAND, HWAddr::INFINIBAND_HWADDR_LEN, src_addr);
++    // Move the buffer read pointer to the end of the Ethernet frame header.
++    buf.setPosition(start_pos + IPOIB_HEADER_LEN);
++}
++
+ void
+ decodeIpUdpHeader(InputBuffer& buf, Pkt4Ptr& pkt) {
+     // The size of the buffer must be at least equal to the minimal size of
+@@ -161,6 +202,51 @@ writeEthernetHeader(const Pkt4Ptr& pkt, OutputBuffer& out_buf) {
+     out_buf.writeUint16(ETHERNET_TYPE_IP);
+ }
+ 
++void
++writeIPoIBHeader(const Iface& iface, const Pkt4Ptr& pkt, OutputBuffer& out_buf) {
++    // Set destination HW address.
++    HWAddrPtr remote_addr = pkt->getRemoteHWAddr();
++    if (remote_addr) {
++        if (remote_addr->hwaddr_.size() != HWAddr::INFINIBAND_HWADDR_LEN) {
++            isc_throw(BadValue, "invalid size of the remote HW address "
++                      << remote_addr->hwaddr_.size() << " when constructing"
++                      << " an ethernet frame header; expected size is"
++                      << " " << HWAddr::INFINIBAND_HWADDR_LEN);
++        } else if ((!pkt->isRelayed() &&
++                    (pkt->getFlags() & Pkt4::FLAG_BROADCAST_MASK)) ||
++                   *remote_addr == zero_ib_hwaddr) {
++            // We also broadcast if the received hwaddr is full zero.
++            // This happens on some IB drivers which don't provide the remote
++            // hwaddr to userspace.
++            // Generally, according to the RFC, all IPoIB clients MUST request
++            // broadcast anyway, but better to be safe and handle non-compliant
++            // clients.
++            if (iface.getBcastMacLen() != HWAddr::INFINIBAND_HWADDR_LEN) {
++                isc_throw(BadValue, "invalid size of the bcast HW address "
++                          << iface.getBcastMacLen() << " when constructing"
++                          << " an ethernet frame header; expected size is"
++                          << " " << HWAddr::INFINIBAND_HWADDR_LEN);
++            }
++            out_buf.writeData(iface.getBcastMac(),
++                              HWAddr::INFINIBAND_HWADDR_LEN);
++        } else {
++            out_buf.writeData(&remote_addr->hwaddr_[0],
++                              HWAddr::INFINIBAND_HWADDR_LEN);
++        }
++    } else {
++        // HW address has not been specified. This is possible when receiving
++        // packet through a logical interface (e.g. lo). In such cases, we
++        // don't want to fail but rather provide a default HW address, which
++        // consists of zeros.
++        out_buf.writeData(&zero_ib_hwaddr.hwaddr_[0], HWAddr::INFINIBAND_HWADDR_LEN);
++    }
++
++    // Type IP.
++    out_buf.writeUint16(ETHERNET_TYPE_IP);
++    // Reserved
++    out_buf.writeUint16(0);
++}
++
+ void
+ writeIpUdpHeader(const Pkt4Ptr& pkt, util::OutputBuffer& out_buf) {
+ 
+diff --git a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.h b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.h
+index fa6a6f6..534ab4e 100644
+--- a/kea-Kea-3.0.3/src/lib/dhcp/protocol_util.h
++++ b/kea-Kea-3.0.3-patch/src/lib/dhcp/protocol_util.h
+@@ -8,6 +8,7 @@
+ #define PROTOCOL_UTIL_H
+ 
+ #include <dhcp/pkt4.h>
++#include <dhcp/iface_mgr.h>
+ #include <util/buffer.h>
+ 
+ #include <stdint.h>
+@@ -39,6 +40,12 @@ static const size_t ETHERNET_PACKET_TYPE_OFFSET = 12;
+ /// and locations on different OSes.
+ static const uint16_t ETHERNET_TYPE_IP = 0x0800;
+ 
++/// Size of the IPoIB pseude frame header.
++static const size_t IPOIB_HEADER_LEN = 24;
++/// Offset of the 2-byte word in the IPoIB pseudo packet which
++/// holds the type of the protocol it encapsulates.
++static const size_t IPOIB_PACKET_TYPE_OFFSET = 20;
++
+ /// Minimal IPv4 header length.
+ static const size_t MIN_IP_HEADER_LEN = 20;
+ /// Offset in the IP header where the flags field starts.
+@@ -75,6 +82,25 @@ static const size_t UDP_DEST_PORT = 2;
+ /// @throw BadValue if pkt object is NULL.
+ void decodeEthernetHeader(util::InputBuffer& buf, Pkt4Ptr& pkt);
+ 
++/// @brief Decode the IPoIB pseudo header.
++///
++/// This function reads IPoIB pesudo frame header from the provided
++/// buffer at the current read position. The source HW address
++/// is read from the header and assigned as client address in
++/// the pkt object. The buffer read pointer is set to the end
++/// of the IPoIB frame header if read was successful.
++///
++/// @warning This function does not check that the provided 'pkt'
++/// pointer is valid. Caller must make sure that pointer is
++/// allocated.
++///
++/// @param buf input buffer holding header to be parsed.
++/// @param [out] pkt packet object receiving HW source address read from header.
++///
++/// @throw InvalidPacketHeader if packet header is truncated
++/// @throw BadValue if pkt object is NULL.
++void decodeIPoIBHeader(util::InputBuffer& buf, Pkt4Ptr& pkt);
++
+ /// @brief Decode IP and UDP header.
+ ///
+ /// This function reads IP and UDP headers from the provided buffer
+@@ -105,6 +131,17 @@ void decodeIpUdpHeader(util::InputBuffer& buf, Pkt4Ptr& pkt);
+ void writeEthernetHeader(const Pkt4Ptr& pkt,
+                          util::OutputBuffer& out_buf);
+ 
++/// @brief Writes IPoIB pseudo frame header into a buffer.
++///
++/// @warning This function does not check that the provided 'pkt'
++/// pointer is valid. Caller must make sure that pointer is
++/// allocated.
++///
++/// @param pkt packet object holding source and destination HW address.
++/// @param [out] out_buf buffer where a header is written.
++void writeIPoIBHeader(const Iface& iface, const Pkt4Ptr& pkt,
++                      util::OutputBuffer& out_buf);
++
+ /// @brief Writes both IP and UDP header into output buffer
+ ///
+ /// This utility function assembles IP and UDP packet headers for the

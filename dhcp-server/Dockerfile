@@ -22,13 +22,13 @@ RUN apt-get update && apt-get install -y \
     python3-sphinxcontrib.applehelp \
     wget \
     python3-sphinx-rtd-theme
-RUN wget https://patch-diff.githubusercontent.com/raw/isc-projects/kea/pull/134.patch
+COPY ./0001-Add-IB-3.0.3.patch /build
 RUN wget https://github.com/isc-projects/kea/archive/refs/tags/Kea-3.0.3.tar.gz \
     && tar -xvf Kea-3.0.3.tar.gz
 # i hate you for ragebaiting the name github
 WORKDIR /build/kea-Kea-3.0.3
 # Add Infiniband Support
-RUN patch -Np1 -i ../134.patch
+RUN patch -Np1 -i ../0001-Add-IB-3.0.3.patch
 WORKDIR /build/kea-Kea-3.0.3/build
 # build instructions from lfs
 RUN meson setup ..             \
@@ -39,10 +39,6 @@ RUN meson setup ..             \
       -D crypto=openssl    \
       -D runstatedir=/var/run
 RUN ninja && DESTDIR=/build/kea ninja install 
-
-
-
-
 
 FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
