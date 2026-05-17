@@ -20,7 +20,7 @@ services:
     build:
       context: ./stork-server
     ports:
-      - "${HOST_IP}:8087:8080"
+      - "${STORK_EXPOSE_IP}:8087:8080"
     environment:
       - STORK_DATABASE_HOST=stork-db
       - STORK_DATABASE_NAME=stork
@@ -38,7 +38,7 @@ services:
     build: ./dhcp-server
     network_mode: "host"
     environment:
-      - STORK_AGENT_SERVER_URL=http://localhost:8087
+      - STORK_AGENT_SERVER_URL=http://${STORK_EXPOSE_IP}:8087
       - STORK_AGENT_HOST=${HOST_IP}
       - INTERFACES=${INTERFACES}
     volumes:

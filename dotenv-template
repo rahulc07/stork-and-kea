@@ -3,3 +3,5 @@ INTERFACES="eno2"
 HOST_IP=192.168.1.1
 # Postgres Settings
 DB_PASSWORD=setthispassword
+# this should probably be set the same as host_ip but if you want to hide the stork ui change this to 127.0.0.1
+STORK_WEBUI_IP=192.168.1.1
