@@ -1,5 +1,13 @@
 {
+
 "Dhcp4": {
+    "hosts-databases": [{
+       "type": "postgresql",
+       "name": "kea",
+       "user": "stork",
+       "password": "$DB_PASSWORD",
+       "host": "/var/run/postgresql"
+    }],
     "hooks-libraries": [
         {
             "library": "/usr/lib/x86_64-linux-gnu/kea/hooks/libdhcp_host_cmds.so"

@@ -9,6 +9,7 @@ services:
       - POSTGRES_DB=stork
     volumes: 
       - ./postgres:/var/lib/postgresql
+      - kea-db-socket:/var/run/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stork"]
       interval: 5s
@@ -46,5 +47,9 @@ services:
       - ./kea-config:/etc/kea
       - ./kea-sockets:/var/run/kea
       - ./kea-db:/var/lib/kea
+      - kea-db-socket:/var/run/postgresql
     depends_on:
+      - stork-db
       - stork-server
+volumes:
+  kea-db-socket:
