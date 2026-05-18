@@ -7,13 +7,14 @@ if [ -z "$(ls -A /etc/kea)" ]; then
     envsubst < /etc/kea-distribution/kea-dhcp4.conf.template > /etc/kea/kea-dhcp4.conf
 fi
 
+export PGUSER=${DB_USER}
+export PGPASSWORD="${DB_PASSWORD}"
+export PGHOST="/var/run/postgresql"
 until pg_isready -U "$DB_USER" -h "/var/run/postgresql"; do
   sleep 1
 done
 
-echo "Checking if 'kea' database exists..."
 DB_EXISTS=$(psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='kea'")
-
 if [ "$DB_EXISTS" != "1" ]; then
     echo "'kea' database not found. creating..."
     psql -d postgres -c "CREATE DATABASE kea;"
