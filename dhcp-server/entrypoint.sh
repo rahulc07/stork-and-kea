@@ -14,17 +14,14 @@ until pg_isready -U "$DB_USER" -h "/var/run/postgresql"; do
   sleep 1
 done
 
+DB_ARGS="-u $DB_USER -p ${DB_PASSWORD} -n kea -h /var/run/postgresql"
 DB_EXISTS=$(psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='kea'")
 if [ "$DB_EXISTS" != "1" ]; then
     echo "'kea' database not found. creating..."
     psql -d postgres -c "CREATE DATABASE kea;"
+    kea-admin db-init pgsql $DB_ARGS
 fi
 
-DB_ARGS="-u $DB_USER -p ${DB_PASSWORD} -n kea -a /var/run/postgresql"
-if ! kea-admin db-check postgresql $DB_ARGS > /dev/null 2>&1; then
-    echo "Tables missing, running migrations..."
-    kea-admin db-init postgresql $DB_ARGS
-fi
 
 chown -R _kea:_kea /etc/kea /run/kea /var/lib/kea
 chmod -R 750 /run/kea
