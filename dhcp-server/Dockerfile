@@ -55,6 +55,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     supervisor \
     liblog4cplus-2.0.5t64 \
+    postgresql-server-dev-all \
+    libpq-dev \
     gettext-base \
     libboost-all-dev \
     && curl -1sLf 'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash \

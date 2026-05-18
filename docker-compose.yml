@@ -39,6 +39,8 @@ services:
     build: ./dhcp-server
     network_mode: "host"
     environment:
+      - DB_USER=stork
+      - DB_PASSWORD=${DB_PASSWORD}
       - STORK_AGENT_SERVER_URL=http://${STORK_EXPOSE_IP}:8087
       - STORK_AGENT_HOST=${HOST_IP}
       - INTERFACES=${INTERFACES}
