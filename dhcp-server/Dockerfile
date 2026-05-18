@@ -37,7 +37,7 @@ RUN meson setup ..             \
       --localstatedir=/var \
       --buildtype=release  \
       -D crypto=openssl    \
-      -D postgres=enabled \
+      -D postgresql=enabled \
       -D runstatedir=/var/run
 RUN ninja && DESTDIR=/build/kea ninja install 
 
