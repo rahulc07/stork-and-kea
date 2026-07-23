@@ -1,6 +1,6 @@
 services:
   stork-db:
-    restart: unless-stopped
+    restart: always
     image: postgres:18
     shm_size: 128mb
     environment:
@@ -17,7 +17,7 @@ services:
       retries: 5
 
   stork-server:
-    restart: unless-stopped
+    restart: always
     build:
       context: ./stork-server
     ports:
@@ -32,7 +32,7 @@ services:
         condition: service_healthy
   # no ports needed cause network_mode: hsot
   kea-dhcp:
-    restart: unless-stopped
+    restart: always
     cap_add:
       - NET_ADMIN
       - NET_RAW
